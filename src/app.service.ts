@@ -2,9 +2,47 @@ import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class AppService {
-  proxy() {
+  private limitMap = new Map<string, { count: number, resetTime: number }>();
+  proxy(userId: string) {
     //API 호출
-    return true;
+    if (!this.isAllowed(userId)) {
+      throw new Error('Limit Exceeded');
+    }
+    this.updatedRateLimit(userId);
+
+    return this.mockRequest(userId);
+  }
+
+  private isAllowed(userId: string): boolean {
+    const userRatedLimit = this.limitMap.get(userId);
+    const currentTime = Date.now();
+    
+    if (!userRatedLimit) {
+      return true;
+    }
+    if (currentTime > userRatedLimit.resetTime) {
+      return true;
+    }
+    return userRatedLimit.count < 10;
+  }
+
+  private updatedRateLimit(userId:string): void {
+    const currentTime = Date.now();
+    const userRatedLimit = this.limitMap.get(userId);
+    console.log("userRatedLimit",userRatedLimit);
+
+    if (!userRatedLimit || currentTime > userRatedLimit.resetTime) {
+      this.limitMap.set(userId, { count: 1, resetTime: currentTime + 1000 });
+    } else {
+      userRatedLimit.count++;
+    }
+  }
+
+  private mockRequest(userId: string): any {
+    return {
+      status: 'success',
+      message: `user ${userId} processed successfully.`
+    };
   }
 
   /**
@@ -32,7 +70,21 @@ export class AppService {
       keyword: '가구',
     };
 
+    const matchedCategory = categoryList.find(category => category.name === product.keyword);
+    let matchedProduct = {};
+    if (matchedCategory) {
+      matchedProduct = {
+        product: {
+          name : product.name,
+          category: {
+            id: matchedCategory.id,
+            name: matchedCategory.name
+          }
+        }
+      };
+    }
     const end = Date.now();
+    console.log("matchedProduct",matchedProduct);
     return end - start;
   }
 
@@ -51,6 +103,8 @@ export class AppService {
       translateWordList.push({ src: index.toString(), dest: `A` });
     });
 
+    const translateMap = new Map(translateWordList.map(item => [item.src, item.dest]));
+    const regex = new RegExp(Array.from(translateMap.keys()).join('|'), 'g');
     const optionList = [
       { id: 1, name: '블랙 XL' },
       { id: 2, name: '블랙 L' },
@@ -65,7 +119,12 @@ export class AppService {
 
     const start = Date.now();
 
+    const updatedOptionList = optionList.map(option => ({
+      ...option,
+      name: option.name.replace(regex, matched => translateMap.get(matched) || matched)
+    }));
     const end = Date.now();
+    console.log("updatedOptionList",updatedOptionList);
     return end - start;
   }
 }

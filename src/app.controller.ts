@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Req, Headers, HttpException, HttpStatus } from '@nestjs/common';
 import { AppService } from './app.service';
 
 @Controller()
@@ -6,9 +6,16 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
 
   //프록시 처리
-  @Get()
-  proxy() {
-    return this.appService.proxy();
+  @Get('proxy')
+  proxy(@Headers('id') userId: string) {
+    if (!userId) {
+      throw new HttpException('Not found User', HttpStatus.BAD_REQUEST);
+    };
+    try {
+      return this.appService.proxy(userId);
+    } catch (error) {
+      throw new HttpException('Rate Limit Exceeded', HttpStatus.TOO_MANY_REQUESTS);
+    }
   }
 
   @Get('challenge1')
